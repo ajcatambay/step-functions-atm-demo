@@ -1,0 +1,125 @@
+{
+  "Comment": "State Machine of an ATM concept demo",
+  "StartAt": "TxnInitService",
+  "States": {
+    "TxnInitService": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "",
+        "Payload": {
+          "Input.$": "$"
+        }
+      },
+      "ResultSelector": {
+        "txnId.$": "$.Payload.txnId",
+        "txnDateTime.$": "$.Payload.txnDateTime"
+      },
+      "ResultPath": "$.metadata",
+      "Next": "AuthService"
+    },
+    "AuthService": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "",
+        "Payload": {
+          "Input.$": "$"
+        }
+      },
+      "ResultSelector": {
+        "isAuthenticated.$": "$.Payload.isAuthenticated",
+        "status.$": "$.Payload.status",
+        "message.$": "$.Payload.message"
+      },
+      "ResultPath": "$.response",
+      "Next": "isAuthenticated"
+    },
+    "isAuthenticated": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.response.isAuthenticated",
+          "BooleanEquals": true,
+          "Next": "transactionType"
+        }
+      ],
+      "Default": "TransactionLogger"
+    },
+    "transactionType": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.transactionType",
+          "StringEquals": "BAL_INQ",
+          "Next": "BalanceInquiryService"
+        },
+        {
+          "Variable": "$.transactionType",
+          "StringEquals": "WITHDRAWAL",
+          "Next": "WithdrawalService"
+        }
+      ]
+    },
+    "BalanceInquiryService": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "",
+        "Payload": {
+          "Input.$": "$"
+        }
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status",
+        "message.$": "$.Payload.message"
+      },
+      "ResultPath": "$.response",
+      "Next": "TransactionLogger"
+    },
+    "WithdrawalService": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "",
+        "Payload": {
+          "Input.$": "$"
+        }
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status",
+        "message.$": "$.Payload.message"
+      },
+      "ResultPath": "$.response",
+      "Next": "TransactionLogger"
+    },
+    "TransactionLogger": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "TransactionLogs",
+        "Item": {
+          "id": {
+            "S.$": "$.metadata.txnId"
+          },
+          "accountId": {
+            "S.$": "$.accountId"
+          },
+          "transactionType": {
+            "S.$": "$.transactionType"
+          },
+          "status": {
+            "S.$": "$.response.status"
+          },
+          "message": {
+            "S.$": "$.response.message"
+          },
+          "transactionDtm": {
+            "S.$": "$.metadata.txnDateTime"
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}

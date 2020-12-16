@@ -1,0 +1,52 @@
+service: step-functions-atm-demo
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: ap-southeast-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+      Resource: arn:aws:dynamodb:ap-southeast-1:*:*
+    - Effect: Allow
+      Action:
+        - states:StartExecution
+      Resource: arn:aws:states:ap-southeast-1:226320724014:stateMachine:ATMStateMachine
+
+functions:
+  step-function-caller:
+    handler: handler.caller
+    events:
+     - http:
+        path: atm-step-functions-demo
+        method: post
+        cors: true
+  txnInitService:
+    handler: src/TxnInitService.txnInit
+  authService:
+    handler: src/AuthService.auth
+  balanceInquiryService:
+    handler: src/BalanceInquiryService.balinq
+  withdrawalService:
+    handler: src/WithdrawalService.withdraw
+
+resources:
+  Resources:
+    TransactionLogTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: id
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: 'TransactionLogs'
